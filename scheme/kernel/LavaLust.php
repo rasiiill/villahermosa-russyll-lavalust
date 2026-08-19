@@ -235,8 +235,67 @@ if (php_sapi_name() === 'cli') {
     $method = 'GET';
     
 } else {
-    $url = $router->sanitize_url(str_replace($_SERVER['SCRIPT_NAME'], '', $_SERVER['PHP_SELF']));
-    $method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper($_SERVER['REQUEST_METHOD']) : 'GET';
+
+    /*
+     * Get the actual URL requested by the browser.
+     * This works with Apache, Laragon, subfolders,
+     * PHP development server, and Render.
+     */
+    $request_path = parse_url(
+        $_SERVER['REQUEST_URI'] ?? '/',
+        PHP_URL_PATH
+    );
+
+    if (empty($request_path)) {
+        $request_path = '/';
+    }
+
+    /*
+     * Find the application's base directory.
+     *
+     * Example:
+     * /LavaLust/public/index.php
+     * becomes:
+     * /LavaLust
+     */
+    $script_name = str_replace(
+        '\\',
+        '/',
+        $_SERVER['SCRIPT_NAME'] ?? ''
+    );
+
+    $base_path = rtrim(
+        dirname($script_name),
+        '/\\'
+    );
+
+    $base_path = preg_replace(
+        '#/public$#',
+        '',
+        $base_path
+    );
+
+    if (
+        !empty($base_path) &&
+        $base_path !== '.' &&
+        $base_path !== '/' &&
+        strpos($request_path, $base_path) === 0
+    ) {
+        $request_path = substr(
+            $request_path,
+            strlen($base_path)
+        );
+    }
+
+    if (empty($request_path)) {
+        $request_path = '/';
+    }
+
+    $url = $router->sanitize_url($request_path);
+
+    $method = isset($_SERVER['REQUEST_METHOD'])
+        ? strtoupper($_SERVER['REQUEST_METHOD'])
+        : 'GET';
 }
 
 if (empty($url)) $url = '/';
